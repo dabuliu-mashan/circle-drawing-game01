@@ -123,42 +123,74 @@ function calculateScore() {
     centerX /= points.length;
     centerY /= points.length;
 
-    // 计算平均半径
-    let radii = points.map(point => {
+    // 1. 计算半径和角度
+    let radii = [];
+    let angles = [];
+    points.forEach(point => {
         const dx = point.x - centerX;
         const dy = point.y - centerY;
-        return Math.sqrt(dx * dx + dy * dy);
+        const radius = Math.sqrt(dx * dx + dy * dy);
+        const angle = Math.atan2(dy, dx);
+        radii.push(radius);
+        angles.push(angle);
     });
 
+    // 2. 计算圆度分数（新方法）
+    // 2.1 半径一致性评分
     const avgRadius = radii.reduce((a, b) => a + b) / radii.length;
+    const radiusVariance = radii.reduce((sum, r) => sum + Math.pow(r - avgRadius, 2), 0) / radii.length;
+    const radiusStdDev = Math.sqrt(radiusVariance);
+    const radiusConsistencyScore = Math.max(0, 100 * (1 - (radiusStdDev / avgRadius) * 2));
 
-    // 1. 计算圆度分数（基于半径的一致性）
-    const radiusVariance = radii.reduce((sum, r) => sum + Math.abs(r - avgRadius), 0) / radii.length;
-    const radiusConsistencyScore = Math.max(0, 100 * (1 - radiusVariance / avgRadius));
+    // 2.2 曲率变化评分
+    let curvatureScore = 0;
+    const minPoints = 4; // 需要至少4个点来计算曲率
+    if (points.length >= minPoints) {
+        let curvatures = [];
+        for (let i = 1; i < points.length - 1; i++) {
+            const prev = points[i - 1];
+            const curr = points[i];
+            const next = points[i + 1];
+            
+            // 计算两个向量
+            const v1x = curr.x - prev.x;
+            const v1y = curr.y - prev.y;
+            const v2x = next.x - curr.x;
+            const v2y = next.y - curr.y;
+            
+            // 计算向量夹角
+            const dot = v1x * v2x + v1y * v2y;
+            const cross = v1x * v2y - v1y * v2x;
+            const angle = Math.atan2(cross, dot);
+            
+            curvatures.push(Math.abs(angle));
+        }
+        
+        // 计算曲率的一致性
+        const avgCurvature = curvatures.reduce((a, b) => a + b) / curvatures.length;
+        const curvatureVariance = curvatures.reduce((sum, c) => sum + Math.pow(c - avgCurvature, 2), 0) / curvatures.length;
+        curvatureScore = Math.max(0, 100 * (1 - Math.sqrt(curvatureVariance) * 2));
+    }
 
-    // 2. 计算点分布均匀性
-    let angles = points.map(point => {
-        const dx = point.x - centerX;
-        const dy = point.y - centerY;
-        return Math.atan2(dy, dx);
-    });
-    
-    // 确保角度都是正值（0到2π）
-    angles = angles.map(angle => angle < 0 ? angle + 2 * Math.PI : angle);
-    
-    // 计算相邻点之间的角度差
+    // 2.3 角度分布评分（检测是否为多边形）
     let angleDiffs = [];
     for (let i = 1; i < angles.length; i++) {
         let diff = angles[i] - angles[i-1];
-        if (diff < 0) diff += 2 * Math.PI;
-        angleDiffs.push(diff);
+        if (diff < -Math.PI) diff += 2 * Math.PI;
+        if (diff > Math.PI) diff -= 2 * Math.PI;
+        angleDiffs.push(Math.abs(diff));
     }
     
-    // 计算角度分布的均匀性
-    const avgAngleDiff = (2 * Math.PI) / angles.length;
-    const angleVariance = angleDiffs.reduce((sum, diff) => 
-        sum + Math.abs(diff - avgAngleDiff), 0) / angleDiffs.length;
-    const distributionScore = Math.max(0, 100 * (1 - angleVariance / avgAngleDiff));
+    // 添加首尾角度差
+    let lastDiff = angles[0] - angles[angles.length - 1];
+    if (lastDiff < -Math.PI) lastDiff += 2 * Math.PI;
+    if (lastDiff > Math.PI) lastDiff -= 2 * Math.PI;
+    angleDiffs.push(Math.abs(lastDiff));
+    
+    // 检测是否存在突变点（多边形的特征）
+    const maxAngleDiff = Math.max(...angleDiffs);
+    const minAngleDiff = Math.min(...angleDiffs);
+    const angleVarianceScore = Math.max(0, 100 * (1 - (maxAngleDiff - minAngleDiff) * 2));
 
     // 3. 计算闭合度分数
     const startPoint = points[0];
@@ -167,19 +199,27 @@ function calculateScore() {
         Math.pow(startPoint.x - endPoint.x, 2) + 
         Math.pow(startPoint.y - endPoint.y, 2)
     );
-    const closureScore = Math.max(0, 100 * (1 - closureDistance / (avgRadius * 0.5)));
+    const closureScore = Math.max(0, 100 * (1 - closureDistance / (avgRadius * 0.3)));
 
-    // 综合评分：
-    // - 圆度（半径一致性）: 60%
-    // - 点分布均匀性: 30%
-    // - 闭合度: 10%
+    // 4. 计算点密度均匀性
+    const idealPointCount = Math.ceil(2 * Math.PI * avgRadius / 5); // 每5像素一个点
+    const densityScore = Math.max(0, 100 * (1 - Math.abs(points.length - idealPointCount) / idealPointCount));
+
+    // 综合评分
+    // 圆度权重提高到70%，其中曲率占35%，半径一致性占20%，角度分布占15%
     score = Math.floor(
-        radiusConsistencyScore * 0.6 +
-        distributionScore * 0.3 +
-        closureScore * 0.1
+        curvatureScore * 0.35 +
+        radiusConsistencyScore * 0.20 +
+        angleVarianceScore * 0.15 +
+        closureScore * 0.20 +
+        densityScore * 0.10
     );
 
-    // 确保分数在0-100之间
+    // 如果任何一项得分过低，说明可能是多边形
+    if (curvatureScore < 50 || radiusConsistencyScore < 50 || angleVarianceScore < 50) {
+        score = Math.min(score, 50);
+    }
+
     score = Math.max(0, Math.min(100, score));
     scoreElement.textContent = `得分: ${score}`;
     
@@ -261,4 +301,4 @@ function initLeaderboard() {
 }
 
 // 在页面加载时初始化排行榜
-// initLeaderboard(); // 如果需要清空排行榜，取消这行的注释 console.log('test');
+// initLeaderboard(); // 如果需要清空排行榜，取消这行的注释 
