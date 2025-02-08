@@ -261,4 +261,4 @@ function initLeaderboard() {
 }
 
 // 在页面加载时初始化排行榜
-// initLeaderboard(); // 如果需要清空排行榜，取消这行的注释 
+// initLeaderboard(); // 如果需要清空排行榜，取消这行的注释 console.log('test');
