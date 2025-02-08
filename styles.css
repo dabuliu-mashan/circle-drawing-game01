@@ -1,0 +1,148 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
+}
+
+body {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    margin: 0;
+    background-color: #f0f0f0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+#game-container {
+    width: 100%;
+    max-width: 500px;
+    padding: 20px;
+}
+
+.game-area {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+}
+
+#drawing-canvas {
+    width: 300px;
+    height: 300px;
+    background-color: #fff;
+    border: 2px solid #000;
+    border-radius: 8px;
+    touch-action: none;
+}
+
+#score {
+    font-size: 24px;
+    font-weight: bold;
+    color: #333;
+}
+
+.button-group {
+    display: flex;
+    gap: 20px;
+    width: 100%;
+    justify-content: center;
+}
+
+.button-group button {
+    padding: 12px 24px;
+    font-size: 16px;
+    cursor: pointer;
+    border: none;
+    border-radius: 8px;
+    transition: background-color 0.3s;
+    -webkit-tap-highlight-color: transparent;
+}
+
+#refresh-button {
+    background-color: #4CAF50;
+    color: white;
+}
+
+#refresh-button:hover {
+    background-color: #45a049;
+}
+
+#leaderboard-button {
+    background-color: #2196F3;
+    color: white;
+}
+
+#leaderboard-button:hover {
+    background-color: #1976D2;
+}
+
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.modal-content {
+    background-color: white;
+    padding: 20px;
+    border-radius: 12px;
+    width: 90%;
+    max-width: 400px;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.modal-content h3 {
+    margin: 0 0 20px 0;
+    color: #333;
+    font-size: 24px;
+}
+
+#leaderboard-content {
+    font-size: 18px;
+    line-height: 1.8;
+    margin-bottom: 20px;
+    text-align: left;
+}
+
+#close-modal {
+    width: 100%;
+    padding: 12px;
+    font-size: 16px;
+    cursor: pointer;
+    background-color: #666;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    transition: background-color 0.3s;
+}
+
+#close-modal:hover {
+    background-color: #555;
+}
+
+.hidden {
+    display: none;
+}
+
+@media (max-width: 400px) {
+    #drawing-canvas {
+        width: 280px;
+        height: 280px;
+    }
+
+    .button-group button {
+        padding: 10px 20px;
+        font-size: 14px;
+    }
+} 

@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <meta name="format-detection" content="telephone=no">
+    <title>画圆小游戏</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div id="game-container">
+        <div class="game-area">
+            <canvas id="drawing-canvas"></canvas>
+            <div id="score">得分: 0</div>
+            <div class="button-group">
+                <button id="refresh-button">重新开始</button>
+                <button id="leaderboard-button">排行榜</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 排行榜弹窗 -->
+    <div id="leaderboard-modal" class="modal hidden">
+        <div class="modal-content">
+            <h3>排行榜</h3>
+            <div id="leaderboard-content"></div>
+            <button id="close-modal">关闭</button>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html> 
