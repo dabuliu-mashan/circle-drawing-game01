@@ -108,13 +108,13 @@ function clearCanvas() {
 }
 
 function calculateScore() {
-    if (points.length < 3) {
+    if (points.length < 20) { // 需要足够多的点才能判断是否为圆形
         score = 0;
         scoreElement.textContent = '得分: 0';
         return;
     }
 
-    // 计算中心点
+    // 1. 计算几何中心
     let centerX = 0, centerY = 0;
     points.forEach(point => {
         centerX += point.x;
@@ -123,101 +123,98 @@ function calculateScore() {
     centerX /= points.length;
     centerY /= points.length;
 
-    // 1. 计算半径和角度
-    let radii = [];
-    let angles = [];
-    points.forEach(point => {
+    // 2. 计算到中心的距离（半径）
+    let radii = points.map(point => {
         const dx = point.x - centerX;
         const dy = point.y - centerY;
-        const radius = Math.sqrt(dx * dx + dy * dy);
-        const angle = Math.atan2(dy, dx);
-        radii.push(radius);
-        angles.push(angle);
+        return Math.sqrt(dx * dx + dy * dy);
     });
 
-    // 2. 计算圆度分数（新方法）
-    // 2.1 半径一致性评分
+    // 3. 计算平均半径和标准差
     const avgRadius = radii.reduce((a, b) => a + b) / radii.length;
     const radiusVariance = radii.reduce((sum, r) => sum + Math.pow(r - avgRadius, 2), 0) / radii.length;
     const radiusStdDev = Math.sqrt(radiusVariance);
-    const radiusConsistencyScore = Math.max(0, 100 * (1 - (radiusStdDev / avgRadius) * 2));
+    
+    // 4. 计算角度序列
+    let angles = points.map(point => {
+        const dx = point.x - centerX;
+        const dy = point.y - centerY;
+        return Math.atan2(dy, dx);
+    });
 
-    // 2.2 曲率变化评分
-    let curvatureScore = 0;
-    const minPoints = 4; // 需要至少4个点来计算曲率
-    if (points.length >= minPoints) {
-        let curvatures = [];
-        for (let i = 1; i < points.length - 1; i++) {
-            const prev = points[i - 1];
-            const curr = points[i];
-            const next = points[i + 1];
-            
-            // 计算两个向量
-            const v1x = curr.x - prev.x;
-            const v1y = curr.y - prev.y;
-            const v2x = next.x - curr.x;
-            const v2y = next.y - curr.y;
-            
-            // 计算向量夹角
-            const dot = v1x * v2x + v1y * v2y;
-            const cross = v1x * v2y - v1y * v2x;
-            const angle = Math.atan2(cross, dot);
-            
-            curvatures.push(Math.abs(angle));
-        }
-        
-        // 计算曲率的一致性
-        const avgCurvature = curvatures.reduce((a, b) => a + b) / curvatures.length;
-        const curvatureVariance = curvatures.reduce((sum, c) => sum + Math.pow(c - avgCurvature, 2), 0) / curvatures.length;
-        curvatureScore = Math.max(0, 100 * (1 - Math.sqrt(curvatureVariance) * 2));
-    }
-
-    // 2.3 角度分布评分（检测是否为多边形）
-    let angleDiffs = [];
+    // 5. 检测多边形特征
+    // 5.1 计算角度变化率
+    let angleChanges = [];
     for (let i = 1; i < angles.length; i++) {
-        let diff = angles[i] - angles[i-1];
-        if (diff < -Math.PI) diff += 2 * Math.PI;
-        if (diff > Math.PI) diff -= 2 * Math.PI;
-        angleDiffs.push(Math.abs(diff));
+        let change = angles[i] - angles[i-1];
+        if (change < -Math.PI) change += 2 * Math.PI;
+        if (change > Math.PI) change -= 2 * Math.PI;
+        angleChanges.push(Math.abs(change));
     }
-    
-    // 添加首尾角度差
-    let lastDiff = angles[0] - angles[angles.length - 1];
-    if (lastDiff < -Math.PI) lastDiff += 2 * Math.PI;
-    if (lastDiff > Math.PI) lastDiff -= 2 * Math.PI;
-    angleDiffs.push(Math.abs(lastDiff));
-    
-    // 检测是否存在突变点（多边形的特征）
-    const maxAngleDiff = Math.max(...angleDiffs);
-    const minAngleDiff = Math.min(...angleDiffs);
-    const angleVarianceScore = Math.max(0, 100 * (1 - (maxAngleDiff - minAngleDiff) * 2));
 
-    // 3. 计算闭合度分数
+    // 5.2 检测角点（突变点）
+    const avgAngleChange = angleChanges.reduce((a, b) => a + b) / angleChanges.length;
+    const maxAngleChange = Math.max(...angleChanges);
+    const minAngleChange = Math.min(...angleChanges);
+    const angleChangeRatio = maxAngleChange / (minAngleChange || 0.001);
+
+    // 6. 计算曲率一致性
+    let curvatures = [];
+    for (let i = 2; i < points.length - 2; i++) {
+        const p1 = points[i - 2];
+        const p2 = points[i - 1];
+        const p3 = points[i];
+        const p4 = points[i + 1];
+        const p5 = points[i + 2];
+
+        // 计算连续三点的曲率
+        const k1 = calculateLocalCurvature(p1, p2, p3);
+        const k2 = calculateLocalCurvature(p2, p3, p4);
+        const k3 = calculateLocalCurvature(p3, p4, p5);
+
+        curvatures.push(Math.abs(k2));
+    }
+
+    // 7. 判断是否为多边形或异形
+    const isPolygon = 
+        angleChangeRatio > 3 || // 存在明显的角点
+        radiusStdDev / avgRadius > 0.1 || // 半径变化太大
+        maxAngleChange > Math.PI / 4; // 存在锐角
+
+    if (isPolygon) {
+        score = 0;
+        scoreElement.textContent = '得分: 0 (非圆形)';
+        return;
+    }
+
+    // 8. 圆形评分（仅在通过多边形检测后）
+    // 8.1 半径一致性得分 (40%)
+    const radiusScore = Math.max(0, 100 * (1 - (radiusStdDev / avgRadius) * 5));
+
+    // 8.2 曲率一致性得分 (40%)
+    const avgCurvature = curvatures.reduce((a, b) => a + b) / curvatures.length;
+    const curvatureVariance = curvatures.reduce((sum, c) => sum + Math.pow(c - avgCurvature, 2), 0) / curvatures.length;
+    const curvatureScore = Math.max(0, 100 * (1 - Math.sqrt(curvatureVariance) * 5));
+
+    // 8.3 闭合性得分 (20%)
     const startPoint = points[0];
     const endPoint = points[points.length - 1];
     const closureDistance = Math.sqrt(
         Math.pow(startPoint.x - endPoint.x, 2) + 
         Math.pow(startPoint.y - endPoint.y, 2)
     );
-    const closureScore = Math.max(0, 100 * (1 - closureDistance / (avgRadius * 0.3)));
+    const closureScore = Math.max(0, 100 * (1 - closureDistance / (avgRadius * 0.2)));
 
-    // 4. 计算点密度均匀性
-    const idealPointCount = Math.ceil(2 * Math.PI * avgRadius / 5); // 每5像素一个点
-    const densityScore = Math.max(0, 100 * (1 - Math.abs(points.length - idealPointCount) / idealPointCount));
-
-    // 综合评分
-    // 圆度权重提高到70%，其中曲率占35%，半径一致性占20%，角度分布占15%
+    // 9. 最终评分
     score = Math.floor(
-        curvatureScore * 0.35 +
-        radiusConsistencyScore * 0.20 +
-        angleVarianceScore * 0.15 +
-        closureScore * 0.20 +
-        densityScore * 0.10
+        radiusScore * 0.4 +
+        curvatureScore * 0.4 +
+        closureScore * 0.2
     );
 
-    // 如果任何一项得分过低，说明可能是多边形
-    if (curvatureScore < 50 || radiusConsistencyScore < 50 || angleVarianceScore < 50) {
-        score = Math.min(score, 50);
+    // 10. 额外的严格性检查
+    if (radiusScore < 70 || curvatureScore < 70) {
+        score = Math.min(score, 60); // 如果基本特征不够好，限制最高分
     }
 
     score = Math.max(0, Math.min(100, score));
@@ -228,6 +225,20 @@ function calculateScore() {
         const dateStr = `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}-${now.getDate().toString().padStart(2, '0')} ${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
         addScore(score, dateStr);
     }
+}
+
+// 计算局部曲率的辅助函数
+function calculateLocalCurvature(p1, p2, p3) {
+    const a = Math.sqrt(Math.pow(p1.x - p2.x, 2) + Math.pow(p1.y - p2.y, 2));
+    const b = Math.sqrt(Math.pow(p2.x - p3.x, 2) + Math.pow(p2.y - p3.y, 2));
+    const c = Math.sqrt(Math.pow(p3.x - p1.x, 2) + Math.pow(p3.y - p1.y, 2));
+    
+    // 使用海伦公式计算面积
+    const s = (a + b + c) / 2;
+    const area = Math.sqrt(s * (s - a) * (s - b) * (s - c));
+    
+    // 曲率 = 4 * 面积 / (a * b * c)
+    return 4 * area / (a * b * c);
 }
 
 function addScore(newScore, date) {
